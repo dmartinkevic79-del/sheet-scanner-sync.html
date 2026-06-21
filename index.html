@@ -174,7 +174,7 @@
   </div>
 
   <div class="settings">
-    <input type="text" class="input-url" id="apiUrl" placeholder="Вставьте URL Google Apps Script Web App..." />
+    <input type="text" class="input-url" id="apiUrl" value="СЮДА_ВСТАВЬ_ТВОЮ_ССЫЛКУ_НА_APPS_SCRIPT" placeholder="Вставьте URL Google Apps Script Web App..." />
   </div>
 
   <script>
@@ -255,8 +255,8 @@
       }
 
       const url = document.getElementById('apiUrl').value.trim();
-      if (!url) {
-        alert("Укажите URL Google Apps Script Web App внизу экрана.");
+      if (!url || url === "https://script.google.com/macros/s/AKfycbxXJh5XKFOVGcv7hp6YUuUXh4nwp2RNjiyPES3XUfhXtHMua9lQCu_hQBCLM0jkkCM/exec") {
+        alert("Укажите правильный URL Google Apps Script в коде или внизу экрана.");
         return;
       }
 
