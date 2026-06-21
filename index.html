@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Mobile Scanner</title>
+  <title>Batch Mobile Scanner</title>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #121212;
-      --glass-bg: rgba(255, 255, 255, 0.05);
-      --glass-border: rgba(255, 255, 255, 0.1);
+      --glass-bg: rgba(255, 255, 255, 0.08);
+      --glass-border: rgba(255, 255, 255, 0.15);
       --text: #f0f0f0;
       --muted: #a0a0a0;
       --primary: #4f98a3;
       --primary-active: #3a7a85;
       --danger: #bb653b;
       --success: #6daa45;
-      --radius: 1.2rem;
+      --radius: 1rem;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -31,7 +31,6 @@
       overflow: hidden;
     }
 
-    /* Верхняя панель */
     .header {
       padding: 1rem;
       display: flex;
@@ -45,13 +44,19 @@
 
     .title { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.1em; }
 
-    /* Зона сканера: занимает максимум доступного места */
+    /* Контейнер сканера */
     .scanner-container {
       flex: 1;
       position: relative;
       background: #000;
       display: flex;
       flex-direction: column;
+      transition: box-shadow 0.2s ease;
+    }
+    
+    /* Эффект при успешном сканировании */
+    .scanner-container.flash {
+      box-shadow: inset 0 0 0 8px var(--success);
     }
 
     #reader {
@@ -60,10 +65,10 @@
       border: none;
     }
 
-    /* Панель результатов поверх камеры (Glassmorphism) */
-    .result-panel {
+    /* Панель с очередью сканирования */
+    .batch-panel {
       position: absolute;
-      bottom: 20px;
+      bottom: 15px;
       left: 15px;
       right: 15px;
       background: var(--glass-bg);
@@ -71,45 +76,36 @@
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid var(--glass-border);
       border-radius: var(--radius);
-      padding: 1.2rem;
+      padding: 1rem;
       display: flex;
       flex-direction: column;
-      gap: 1rem;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-      transition: transform 0.3s ease, opacity 0.3s ease;
+      gap: 0.8rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     }
 
-    .result-panel.hidden {
-      transform: translateY(120%);
-      opacity: 0;
-      pointer-events: none;
+    .stats {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.9rem;
     }
 
-    .scanned-text {
-      font-family: monospace;
-      font-size: 1.4rem;
-      font-weight: 700;
-      text-align: center;
-      word-break: break-all;
-      color: var(--success);
-    }
+    .stats .count { font-weight: 700; font-size: 1.2rem; color: var(--success); }
+    .last-scan { font-family: monospace; font-size: 1rem; color: var(--text); background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 6px; }
 
-    /* Кнопки управления (крупные для пальцев) */
+    /* Кнопки */
     .controls {
-      padding: 15px;
       display: flex;
       gap: 10px;
-      background: var(--bg);
-      z-index: 10;
     }
 
     .btn {
       flex: 1;
-      min-height: 54px;
+      min-height: 50px;
       border: none;
-      border-radius: 0.8rem;
+      border-radius: 0.6rem;
       font-size: 1rem;
-      font-weight: 500;
+      font-weight: 700;
       color: #fff;
       background: var(--glass-bg);
       border: 1px solid var(--glass-border);
@@ -117,18 +113,18 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      text-transform: uppercase;
     }
 
     .btn:active { transform: scale(0.98); }
     .btn.primary { background: var(--primary); border-color: var(--primary); }
-    .btn.primary:active { background: var(--primary-active); }
-    .btn.danger { background: var(--danger); border-color: var(--danger); }
+    .btn.danger { background: transparent; border-color: var(--danger); color: var(--danger); }
 
-    /* Скрытый инпут для URL GAS */
     .settings {
-      padding: 0 15px 15px 15px;
+      padding: 10px 15px 15px 15px;
       background: var(--bg);
     }
+    
     .input-url {
       width: 100%;
       background: var(--glass-bg);
@@ -139,28 +135,42 @@
       font-family: monospace;
       font-size: 0.8rem;
     }
+    
+    #startScreen {
+      position: absolute;
+      inset: 0;
+      background: var(--bg);
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
   </style>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
 
   <div class="header">
-    <div class="title">MOBILE SCANNER</div>
+    <div class="title">BATCH SCANNER</div>
   </div>
 
-  <div class="scanner-container">
+  <div class="scanner-container" id="scanContainer">
+    <div id="startScreen">
+      <button class="btn primary" style="width: 80%; max-width: 300px; height: 60px;" onclick="startScanner()">ВКЛЮЧИТЬ КАМЕРУ</button>
+    </div>
+    
     <div id="reader"></div>
     
-    <div class="result-panel hidden" id="resultPanel">
-      <div style="font-size: 0.85rem; color: var(--muted); text-align: center; text-transform: uppercase;">Считанный код</div>
-      <div class="scanned-text" id="scannedCode">—</div>
-      <button class="btn primary" id="sendBtn" onclick="sendData()">Отправить в базу</button>
+    <div class="batch-panel" id="batchPanel" style="display: none;">
+      <div class="stats">
+        <div>В очереди: <span class="count" id="scanCount">0</span></div>
+        <div class="last-scan" id="lastCode">пусто</div>
+      </div>
+      <div class="controls">
+        <button class="btn danger" onclick="clearBatch()">Очистить</button>
+        <button class="btn primary" id="sendBtn" onclick="sendBatch()">ОТПРАВИТЬ ПАРТИЮ</button>
+      </div>
     </div>
-  </div>
-
-  <div class="controls">
-    <button class="btn primary" id="startBtn" onclick="startScanner()">СКАНИРОВАТЬ</button>
-    <button class="btn danger" style="display:none;" id="stopBtn" onclick="stopScanner()">СТОП</button>
   </div>
 
   <div class="settings">
@@ -169,9 +179,8 @@
 
   <script>
     let html5QrCode;
-    let currentCode = "";
+    let scannedBatch = new Set(); // Set автоматически исключает дубликаты
 
-    // Функция для очистки кода от мусора (если попадаются кривые ШК)
     function normalizeCode(raw) {
       let s = String(raw || '').trim();
       if (s.includes('-*-')) s = s.split('-*-')[1];
@@ -179,23 +188,24 @@
       return s.replace(/\s+/g, '');
     }
 
-    async function startScanner() {
-      const readerElement = document.getElementById('reader');
-      const resultPanel = document.getElementById('resultPanel');
-      
-      document.getElementById('startBtn').style.display = 'none';
-      document.getElementById('stopBtn').style.display = 'flex';
-      resultPanel.classList.add('hidden');
+    function updateUI() {
+      document.getElementById('scanCount').textContent = scannedBatch.size;
+      const arr = Array.from(scannedBatch);
+      document.getElementById('lastCode').textContent = arr.length > 0 ? arr[arr.length - 1] : 'пусто';
+    }
 
+    async function startScanner() {
+      document.getElementById('startScreen').style.display = 'none';
+      document.getElementById('batchPanel').style.display = 'flex';
+      
       html5QrCode = new Html5Qrcode("reader");
 
-      // Адаптивная рамка: широкая для длинных штрихкодов, но не слишком высокая
       const config = { 
         fps: 10, 
         qrbox: function(viewfinderWidth, viewfinderHeight) {
             return {
-                width: viewfinderWidth * 0.85,
-                height: Math.min(viewfinderHeight * 0.35, 150) 
+                width: viewfinderWidth * 0.9,
+                height: Math.min(viewfinderHeight * 0.3, 120) 
             };
         }
       };
@@ -208,61 +218,66 @@
         );
       } catch (err) {
         alert("Ошибка доступа к камере: " + err);
-        stopScanner();
       }
-    }
-
-    async function stopScanner() {
-      if (html5QrCode) {
-        try {
-          await html5QrCode.stop();
-          html5QrCode.clear();
-        } catch (err) {
-          console.error("Ошибка при остановке", err);
-        }
-      }
-      document.getElementById('startBtn').style.display = 'flex';
-      document.getElementById('stopBtn').style.display = 'none';
     }
 
     function onScanSuccess(decodedText) {
-      // При успешном сканировании останавливаем камеру и показываем результат
-      stopScanner();
+      const currentCode = normalizeCode(decodedText);
       
-      currentCode = normalizeCode(decodedText);
-      document.getElementById('scannedCode').textContent = currentCode;
-      
-      // Показываем панель
-      const resultPanel = document.getElementById('resultPanel');
-      resultPanel.classList.remove('hidden');
-
-      // Легкая вибрация при успешном сканировании (работает на большинстве смартфонов)
-      if (navigator.vibrate) navigator.vibrate(100);
+      // Если такого кода еще нет в текущей партии
+      if (!scannedBatch.has(currentCode)) {
+        scannedBatch.add(currentCode);
+        updateUI();
+        
+        // Вибрация (если поддерживается устройством)
+        if (navigator.vibrate) navigator.vibrate(100);
+        
+        // Визуальный эффект успешного сканирования (зеленая рамка)
+        const container = document.getElementById('scanContainer');
+        container.classList.add('flash');
+        setTimeout(() => {
+          container.classList.remove('flash');
+        }, 200);
+      }
     }
 
-    async function sendData() {
-      const url = document.getElementById('apiUrl').value.trim();
-      if (!url) {
-        alert("Сначала укажите URL Web App внизу экрана.");
+    function clearBatch() {
+      if(confirm("Очистить текущую очередь? Отсканированные коды не сохранятся.")) {
+        scannedBatch.clear();
+        updateUI();
+      }
+    }
+
+    async function sendBatch() {
+      if (scannedBatch.size === 0) {
+        alert("Очередь пуста. Отсканируйте штрихкоды.");
         return;
       }
-      if (!currentCode) return;
+
+      const url = document.getElementById('apiUrl').value.trim();
+      if (!url) {
+        alert("Укажите URL Google Apps Script Web App внизу экрана.");
+        return;
+      }
 
       const btn = document.getElementById('sendBtn');
       const originalText = btn.textContent;
-      btn.textContent = "Отправка...";
+      btn.textContent = "ОТПРАВКА...";
       btn.style.opacity = "0.7";
+      btn.disabled = true;
 
-      const payload = {
-        raw_code: currentCode,
-        normalized_code: currentCode,
+      // Формируем массив объектов для отправки
+      const payloadData = Array.from(scannedBatch).map(code => ({
+        raw: code,
+        norm: code,
         timestamp: new Date().toISOString()
-      };
+      }));
+
+      const payload = { batch: payloadData };
 
       try {
         const response = await fetch(url, {
           method: 'POST',
-          // ВАЖНО: text/plain обходит проблему CORS preflight запросов
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload)
         });
@@ -272,29 +287,33 @@
         if (result.ok) {
           btn.style.backgroundColor = "var(--success)";
           btn.style.borderColor = "var(--success)";
-          btn.textContent = "Успешно!";
-          if (navigator.vibrate) navigator.vibrate([50, 50, 50]); // Двойная вибрация успеха
+          btn.textContent = "УСПЕШНО!";
+          if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
           
           setTimeout(() => {
-            document.getElementById('resultPanel').classList.add('hidden');
+            // Очищаем партию после успешной отправки
+            scannedBatch.clear();
+            updateUI();
+            
             btn.style.backgroundColor = "var(--primary)";
             btn.style.borderColor = "var(--primary)";
             btn.textContent = originalText;
             btn.style.opacity = "1";
-            startScanner(); // Автоматически запускаем сканер снова
+            btn.disabled = false;
           }, 1500);
         } else {
           throw new Error(result.error || "Ошибка на сервере");
         }
       } catch (error) {
         alert("Не удалось отправить: " + error.message);
-        btn.textContent = "Ошибка. Повторить?";
-        btn.style.backgroundColor = "var(--danger)";
+        btn.textContent = "ОШИБКА. ПОВТОРИТЬ?";
+        btn.style.backgroundColor = "transparent";
         btn.style.borderColor = "var(--danger)";
+        btn.style.color = "var(--danger)";
         btn.style.opacity = "1";
+        btn.disabled = false;
       }
     }
   </script>
 </body>
 </html>
-
