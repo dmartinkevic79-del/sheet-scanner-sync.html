@@ -190,7 +190,7 @@
 
   <script>
     let html5QrCode;
-    let scannedBatch = new Map(); // Используем Map (ключ - norm код, значение - объект с данными)
+    let scannedBatch = new Map();
 
     // АЛГОРИТМ ДЕШИФРАТОРА
     const cyrMap = {С:'N',с:'n',Й:'B',й:'b',ш:'H',Ш:'H',Ф:'S',ф:'s',Ч:'U',ч:'u',У:'Y',у:'y',Ц:'X',ц:'x',М:'K',м:'k',Г:'V',г:'v'};
@@ -249,9 +249,16 @@
       html5QrCode = new Html5Qrcode("reader");
 
       const config = { 
-        fps: 10, 
+        fps: 20, // Ускоренное сканирование
         qrbox: function(viewfinderWidth, viewfinderHeight) {
-            return { width: viewfinderWidth * 0.9, height: Math.min(viewfinderHeight * 0.3, 120) };
+            // Квадратная рамка для удобного захвата QR и Data Matrix
+            const size = Math.min(viewfinderWidth, viewfinderHeight) * 0.75;
+            return { width: size, height: size };
+        },
+        // Запрос максимального качества камеры
+        videoConstraints: {
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
         }
       };
 
