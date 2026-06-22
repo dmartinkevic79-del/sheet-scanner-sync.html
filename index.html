@@ -249,23 +249,25 @@
       html5QrCode = new Html5Qrcode("reader");
 
       const config = { 
-        fps: 20, // Ускоренное сканирование
+        fps: 20, // Оставили ускоренное сканирование (было 10)
         qrbox: function(viewfinderWidth, viewfinderHeight) {
-            // Квадратная рамка для удобного захвата QR и Data Matrix
+            // Оставили квадратную рамку для Data Matrix
             const size = Math.min(viewfinderWidth, viewfinderHeight) * 0.75;
             return { width: size, height: size };
-        },
-        // Запрос максимального качества камеры
-        videoConstraints: {
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
         }
+        // Убрали жесткие videoConstraints, чтобы не ломалась задняя камера!
       };
 
       try {
-        await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess);
+        // Принудительно запрашиваем строго заднюю камеру (exact: environment)
+        await html5QrCode.start({ facingMode: { exact: "environment" } }, config, onScanSuccess);
       } catch (err) {
-        alert("Ошибка доступа к камере: " + err);
+        // Если exact не сработал (редкость для Android, но бывает), пробуем мягкий вариант
+        try {
+          await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess);
+        } catch (e2) {
+          alert("Не удалось запустить заднюю камеру: " + e2);
+        }
       }
     }
 
@@ -313,7 +315,6 @@
       btn.style.opacity = "0.7";
       btn.disabled = true;
 
-      // Формируем массив объектов для отправки со всеми расшифрованными данными
       const payloadData = Array.from(scannedBatch.values()).map(item => ({
         raw: item.raw,
         norm: item.norm,
